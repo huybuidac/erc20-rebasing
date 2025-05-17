@@ -4,11 +4,9 @@ pragma solidity ^0.8.20;
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
-// Removed: import "hardhat/console.sol"; // Typically for debugging, not for abstract/production contracts.
-
 /**
  * @title Abstract ERC20 Rebasing Token
- * @author Your Name/Project Name
+ * @author huybuidac
  * @notice This abstract contract implements an ERC20 token with an elastic supply mechanism.
  * @dev Balances are represented internally as 'shares'. An account's share balance remains constant during a rebase.
  * The rebasing mechanism adjusts the `rebasedTotalSupply`, which in turn changes the token value
@@ -237,19 +235,7 @@ abstract contract ERC20Rebasing is ERC20 {
      * @return The corresponding amount of shares.
      */
     function _convertToShares(uint256 amount, Math.Rounding rounding) internal view virtual returns (uint256) {
-        if (amount == 0) return 0;
-        // If rebasedTotalSupply is 0 (e.g., before first mint, or if contract allows it),
-        // shares are minted based on a ratio to precision. This allows bootstrapping.
-        // `rebasedTotalSupply + 1` ensures denominator is non-zero.
-        // `_totalShares + _precision()` ensures numerator reflects shares or precision baseline.
         unchecked {
-             // If rebasedTotalSupply is effectively zero (e.g. before first mint, or if it could be rebased to near zero)
-            // and _totalShares is also zero (first mint ever), then shares are minted proportional to amount * _precision.
-            // Example: Minting 100 tokens when supply is 0, shares is 0.
-            // shares = 100 * (0 + 1e6) / (0 + 1) = 100 * 1e6.
-            // This establishes an initial token-to-share value.
-            // If totalShares > 0 but rebasedTotalSupply is 0 (e.g. after a massive contraction rebase, or before first mint but after some shares were created through a non-standard mechanism),
-            // this formula still provides a way to calculate shares.
             return amount.mulDiv(_totalShares + _precision(), rebasedTotalSupply + 1, rounding);
         }
     }
@@ -266,15 +252,7 @@ abstract contract ERC20Rebasing is ERC20 {
      * @return The corresponding amount of tokens.
      */
     function _convertToTokens(uint256 shares, Math.Rounding rounding) internal view virtual returns (uint256) {
-        if (shares == 0) return 0;
-        // `_totalShares + _precision()` ensures denominator is non-zero if _precision > 0.
-        // `rebasedTotalSupply + 1` ensures numerator is non-zero if tokens are to have value.
         unchecked {
-            // If _totalShares is zero (no shares exist or precision is also zero), and shares > 0 (which shouldn't happen if _totalShares is 0),
-            // this could lead to issues if _precision is also 0. DEFAULT_PRECISION ensures a non-zero denominator.
-            // If rebasedTotalSupply is 0, tokens effectively have no value unless shares also map to a precision unit.
-            // Example: If rebasedTotalSupply is 0, _totalShares is 1e12 (from previous mints), _precision is 1e6.
-            // tokens = shares * (0 + 1) / (1e12 + 1e6) approx shares / 1e12. (Very small token value).
             return shares.mulDiv(rebasedTotalSupply + 1, _totalShares + _precision(), rounding);
         }
     }
@@ -320,7 +298,6 @@ abstract contract ERC20Rebasing is ERC20 {
                 super._update(account, address(0), uint256(-delta));
                 emit Synced(account, delta, expectedRebasedBalance);
             }
-            // If delta is 0, no balance change, but account is now marked as synced. No event needed.
         }
     }
 
